@@ -1,0 +1,8 @@
+langchain
+faiss-cpu
+unstructured
+sentence-transformers
+openai
+gradio
+tqdm
+pypdf
