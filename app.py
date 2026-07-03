@@ -38,12 +38,12 @@ else:
 # Claude model instead of GPT-2
 llm = ChatAnthropic(
     model="claude-sonnet-5",
-    temperature=0,
     max_tokens=1024,
     system=(
         "You are a legal AI assistant specializing in Sri Lankan law. "
         "Answer only using the provided context from the documents. "
-        "If the answer isn't in the context, say you don't know rather than guessing."
+        "If the answer isn't in the context, say you don't know rather than guessing. "
+        "Be precise, consistent, and avoid speculative or creative phrasing."
     ),
 )
 
