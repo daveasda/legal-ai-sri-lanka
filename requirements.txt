@@ -1,7 +1,12 @@
 langchain
+langchain-community
+langchain-classic
+langchain-anthropic
 faiss-cpu
 unstructured
 sentence-transformers
+transformers
+torch
 openai
 gradio
 tqdm

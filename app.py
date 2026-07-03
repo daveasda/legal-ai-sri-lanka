@@ -1,10 +1,13 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain.chains import ConversationalRetrievalChain
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-from langchain.memory import ConversationBufferMemory
+from langchain_classic.chains import ConversationalRetrievalChain
+from langchain_anthropic import ChatAnthropic
+from langchain_classic.memory import ConversationBufferMemory
 import gradio as gr
 
 # Load documents
@@ -21,45 +24,48 @@ def create_vector_store(documents):
 
 # Load or create vectorstore
 if os.path.exists("faiss_index"):
-    vectorstore = FAISS.load_local("faiss_index", SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"), allow_dangerous_deserialization=True)
+    vectorstore = FAISS.load_local(
+        "faiss_index",
+        SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2"),
+        allow_dangerous_deserialization=True,
+    )
 else:
     print("Index not found. Creating new index...")
     docs = load_documents()
     vectorstore = create_vector_store(docs)
     vectorstore.save_local("faiss_index")
 
-# Load GPT-2 model and tokenizer
-tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-model = GPT2LMHeadModel.from_pretrained("gpt2")
+# Claude model instead of GPT-2
+llm = ChatAnthropic(
+    model="claude-sonnet-5",
+    temperature=0,
+    max_tokens=1024,
+    system=(
+        "You are a legal AI assistant specializing in Sri Lankan law. "
+        "Answer only using the provided context from the documents. "
+        "If the answer isn't in the context, say you don't know rather than guessing."
+    ),
+)
 
-# Setup memory for conversation history
-memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+# Memory for conversation history
+memory = ConversationBufferMemory(
+    memory_key="chat_history", return_messages=True, output_key="answer"
+)
 
-# Define the function to generate response using GPT-2
-def generate_response(query, chat_history=[]):
-    # Concatenate chat history and query to form input
-    input_text = "\n".join([f"User: {q[0]}\nBot: {q[1]}" for q in chat_history]) + f"\nUser: {query}\nBot:"
-    
-    # Tokenize the input
-    inputs = tokenizer.encode(input_text, return_tensors="pt", truncation=True, max_length=1024)
-    
-    # Generate output from GPT-2
-    output = model.generate(inputs, max_length=1024, num_return_sequences=1, no_repeat_ngram_size=2, pad_token_id=tokenizer.eos_token_id)
-    
-    # Decode the output
-    output_text = tokenizer.decode(output[0], skip_special_tokens=True)
-    
-    # Extract the response (the part after the last "Bot:" token)
-    response = output_text.split("Bot:")[-1].strip()
-    
-    # Append the query and response to the chat history
-    chat_history.append((query, response))
-    
+# Build the retrieval chain
+qa_chain = ConversationalRetrievalChain.from_llm(
+    llm=llm,
+    retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
+    memory=memory,
+    return_source_documents=True,
+)
+
+# Gradio-facing function
+def chat_interface(query, chat_history):
+    result = qa_chain.invoke({"question": query})
+    answer = result["answer"]
+    chat_history = chat_history + [(query, answer)]
     return chat_history, chat_history
-
-# Gradio UI
-def chat_interface(query, chat_history=[]):
-    return generate_response(query, chat_history)
 
 with gr.Blocks() as demo:
     gr.Markdown("# 🇱🇰 Legal AI Sri Lanka")
@@ -68,5 +74,6 @@ with gr.Blocks() as demo:
     state = gr.State([])
 
     msg.submit(chat_interface, [msg, state], [chatbot, state])
+    msg.submit(lambda: "", None, msg)  # clear textbox after send
 
 demo.launch()
