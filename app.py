@@ -64,12 +64,16 @@ qa_chain = ConversationalRetrievalChain.from_llm(
 def chat_interface(query, chat_history):
     result = qa_chain.invoke({"question": query})
     answer = result["answer"]
-    chat_history = chat_history + [(query, answer)]
+    chat_history = chat_history + [
+        {"role": "user", "content": query},
+        {"role": "assistant", "content": answer},
+    ]
     return chat_history, chat_history
+
 
 with gr.Blocks() as demo:
     gr.Markdown("# 🇱🇰 Legal AI Sri Lanka")
-    chatbot = gr.Chatbot()
+    chatbot = gr.Chatbot(type="messages")
     msg = gr.Textbox(placeholder="Ask me anything about Sri Lankan law...")
     state = gr.State([])
 
