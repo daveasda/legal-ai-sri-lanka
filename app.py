@@ -14,6 +14,14 @@ import gradio as gr
 def load_documents():
     loader = DirectoryLoader("docs", glob="**/*.pdf", loader_cls=PyPDFLoader)
     documents = loader.load()
+
+    #Debug
+    print(f"Loaded {len(documents)} document chunks")
+    for i, doc in enumerate(documents[:3]):
+        print(f"---Doc {i} ---")
+        print(f"Length: {len(doc.page_content)} characters")
+        print(f"Preview: {doc.page_content[:200]}")
+        
     return documents
 
 # Create vector store
@@ -73,11 +81,11 @@ def chat_interface(query, chat_history):
 
 with gr.Blocks() as demo:
     gr.Markdown("# 🇱🇰 Legal AI Sri Lanka")
-    chatbot = gr.Chatbot(type="messages")
+    chatbot = gr.Chatbot()
     msg = gr.Textbox(placeholder="Ask me anything about Sri Lankan law...")
     state = gr.State([])
 
     msg.submit(chat_interface, [msg, state], [chatbot, state])
-    msg.submit(lambda: "", None, msg)  # clear textbox after send
-
+    msg.submit(lambda: "", None, msg)
+    
 demo.launch()
