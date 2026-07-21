@@ -8,12 +8,17 @@ from langchain_community.vectorstores import FAISS
 from langchain_classic.chains import ConversationalRetrievalChain
 from langchain_anthropic import ChatAnthropic
 from langchain_classic.memory import ConversationBufferMemory
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import gradio as gr
 
 # Load documents
 def load_documents():
     loader = DirectoryLoader("docs", glob="**/*.pdf", loader_cls=PyPDFLoader)
     documents = loader.load()
+    
+    # Split documents into chunks
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200,separators=["\n\n", "\n", " ", ""])
+    documents = text_splitter.split_documents(documents)
 
     #Debug
     print(f"Loaded {len(documents)} document chunks")
