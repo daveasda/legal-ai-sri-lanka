@@ -5,9 +5,7 @@ import os
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_classic.chains import ConversationalRetrievalChain
 from langchain_anthropic import ChatAnthropic
-from langchain_classic.memory import ConversationBufferMemory
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import gradio as gr
 
@@ -20,13 +18,7 @@ def load_documents():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200,separators=["\n\n", "\n", " ", ""])
     documents = text_splitter.split_documents(documents)
 
-    #Debug
-    print(f"Loaded {len(documents)} document chunks")
-    for i, doc in enumerate(documents[:3]):
-        print(f"---Doc {i} ---")
-        print(f"Length: {len(doc.page_content)} characters")
-        print(f"Preview: {doc.page_content[:200]}")
-        
+    print(f"Loaded {len(documents)} document chunks")        
     return documents
 
 # Create vector store
@@ -60,23 +52,21 @@ llm = ChatAnthropic(
     ),
 )
 
-# Memory for conversation history
-memory = ConversationBufferMemory(
-    memory_key="chat_history", return_messages=True, output_key="answer"
-)
 
-# Build the retrieval chain
-qa_chain = ConversationalRetrievalChain.from_llm(
-    llm=llm,
-    retriever=vectorstore.as_retriever(search_kwargs={"k": 4}),
-    memory=memory,
-    return_source_documents=True,
-)
 
-# Gradio-facing function
+# Manual RAG: retrieve chunks, build prompt, call Claude directly
 def chat_interface(query, chat_history):
-    result = qa_chain.invoke({"question": query})
-    answer = result["answer"]
+    docs = vectorstore.similarity_search(query, k=4)
+    context = "\n\n".join(doc.page_content for doc in docs)
+
+    print(f"\n--- Retrieved {len(docs)} chunks for query: '{query}' ---")
+    for i, doc in enumerate(docs):
+        print(f"Chunk {i}: {doc.page_content[:150]}")
+
+    prompt = f"Context:\n{context}\n\nQuestion: {query}"
+    response = llm.invoke(prompt)
+    answer = response.content
+
     chat_history = chat_history + [
         {"role": "user", "content": query},
         {"role": "assistant", "content": answer},
